@@ -4,7 +4,6 @@ Created on Sun Aug 23 11:53:44 2020
 
 @author: sarashs
 """
-import os
 from random import randint
 
 class MD_Analyzer(object):
@@ -14,47 +13,52 @@ class MD_Analyzer(object):
     def __init__(self, Trajectory_file_name, simulation_ID, columns=['ID', 'TYPE', 'CHARGE', 'X', 'Y', 'Z', 'Vx', 'Vy', 'Vz']):
         self.number_of_atoms = 0
         self.place_holder = {'Dimensions' : 0, 'Masses' : 0, 'Atoms' : 0}
-        self.data = {'Dimensions' : (0, 0, 0), 'Types' : {1 : {'mass' : 0, 'count' : 0, 'IDs' : []}}, 'data' = [{1 : {'TYPE' : 0, 'CHARGE' : 0, 'X' : 0, 'Y' : 0, 'Z' : 0}}]} 
-        self.columns = {i : j for i,j in enumerate(columns)}
+        self.data = {'Dimensions' : [0, 0, 0], 'Types' : {1 : {'mass' : 0, 'count' : 0, 'IDs' : []}}, 'data' : {1 : {'TYPE' : 0, 'CHARGE' : 0, 'X' : 0, 'Y' : 0, 'Z' : 0}}} 
+        self.columns = {j : i for i,j in enumerate(columns)}
         if Trajectory_file_name.endswith('.data'):
             self.LAMMPS_Data_file = Trajectory_file_name
             self.file = open(Trajectory_file_name, 'r')
             self.lines = self.file.readlines()
-            for i, j in enumerate(self.lines):
-                if i.endswith(' atoms'):
-                    self.number_of_atoms = int(self.lines.replace(' atoms', '').replace(' ', ''))
+            for j, i in enumerate(self.lines):
+                if ' atoms' in i:
+                    self.number_of_atoms = int(i.replace(' atoms', '').replace(' ', ''))
                     self.place_holder['Dimensions'] = j + 2
                 if i.startswith('Masses'):
                     self.place_holder['Masses'] = j + 2
                 if i.startswith('Atoms'):
                     self.place_holder['Atoms'] = j + 2
-                if self.place_holder['Masses'] < 0 and self.place_holder['Dimensions'] > 0:
+                if self.place_holder['Masses'] == 0 and self.place_holder['Dimensions'] > 0:
                     if i[0].isdigit():
                         dim_info = i.split()
                         if 'xhi' in dim_info:
-                            self.data['Dimensions'][0] = float(dim_info[0])
+                            self.data['Dimensions'][0] = float(dim_info[1])
                         elif 'yhi' in dim_info:
                             self.data['Dimensions'][1] = float(dim_info[1])
                         elif 'zhi' in dim_info:
-                            self.data['Dimensions'][2] = float(dim_info[2])
-                if self.place_holder['Atoms'] < 0 and self.place_holder['Masses'] > 0:
+                            self.data['Dimensions'][2] = float(dim_info[1])
+                if self.place_holder['Atoms'] == 0 and self.place_holder['Masses'] > 0:
                     if i[0].isdigit():
                         mass_info = i.split()
                         self.data['Types'][int(mass_info[0])] = {'mass' : float(mass_info[1]), 'count' : 0, 'IDs' : []}
                 if self.place_holder['Atoms'] > 0 :
                     temp = i.strip().split()
-                    self.data['data'] = temp
-                    type_index = self.columns['TYPE']
-                    charge_index = self.columns['CHARGE']
-                    x_index = self.columns['X']
-                    y_index = self.columns['Y']
-                    z_index = self.columns['Z']
-                    if 'ID' in self.columns.keys():
-                        ID_index = self.columns['ID']
-                        self.data['Types'][temp[type_index]]['IDs'].append(int(temp[ID_index]))
-                        self.data['data'][int(temp[ID_index])] = {'TYPE' : int(temp[ID_index]), 'CHARGE' : float(temp[charge_index]), 'X' : float(temp[x_index]), 'Y' : float(temp[y_index]), 'Z' : float(temp[z_index])}
-                    else:
-                        self.data['Types'][temp[type_index]]['IDs'].append(j + 1 - self.place_holder['Atoms'])
+                    if temp[0].isdigit():
+                        type_index = self.columns['TYPE']
+                        charge_index = self.columns['CHARGE']
+                        x_index = self.columns['X']
+                        y_index = self.columns['Y']
+                        z_index = self.columns['Z']
+                        if 'ID' in self.columns.keys():
+                            ID_index = self.columns['ID']
+                            self.data['Types'][int(temp[type_index])]['IDs'].append(int(temp[ID_index]))
+                            self.data['Types'][int(temp[type_index])]['count'] += 1
+                            self.data['data'][int(temp[ID_index])] = {'TYPE' : int(temp[type_index]), 'CHARGE' : float(temp[charge_index]), 'X' : float(temp[x_index]), 'Y' : float(temp[y_index]), 'Z' : float(temp[z_index])}
+                        else:
+                            ID = j + 1 - self.place_holder['Atoms']
+                            self.data['Types'][int(temp[type_index])]['IDs'].append(ID)
+                            self.data['Types'][int(temp[type_index])]['count'] += 1
+                            self.data['data'][ID] = {'TYPE' : int(temp[type_index]), 'CHARGE' : float(temp[charge_index]), 'X' : float(temp[x_index]), 'Y' : float(temp[y_index]), 'Z' : float(temp[z_index])}
+
             self.file.close()
         elif Trajectory_file_name.endswith('.lammpstrj'):
             self.LAMMPS_Data_file = Trajectory_file_name.replace('.lammpstrj', '.data')
@@ -63,33 +67,34 @@ class MD_Analyzer(object):
     def Magnetic_fluctuation(self, number_of_time_steps):
         pass
     def save_as_lammps_data(self):
-        file = open(self.LAMMPS_Data_file, 'w')
-        file.write('# System description #######################\n' + '#\n\n' + str(self.number_of_atoms) + ' atoms\n' + len(list(self.data['Types'].keys())) + ' atom types\n')
-        file.write('0 ' + self.data['Dimensions'][0] + ' xlo xhi\n' + '0 ' + self.data['Dimensions'][1] + ' ylo yhi\n' + '0 ' + self.data['Dimensions'][2] + ' zlo zhi\n')
+        file = open(self.LAMMPS_Data_file.replace('.data','') + self.simulation_ID + '.data', 'w')
+        file.write('# System description #######################\n' + '#\n\n' + str(self.number_of_atoms) + ' atoms\n' + str(len(list(self.data['Types'].keys()))) + ' atom types\n')
+        file.write('0 ' + str(self.data['Dimensions'][0]) + ' xlo xhi\n' + '0 ' + str(self.data['Dimensions'][1]) + ' ylo yhi\n' + '0 ' + str(self.data['Dimensions'][2]) + ' zlo zhi\n')
         file.write('#\n' + '# for a crystal:\n' + '# lx=a;  ly2+xy2=b2;  lz2+xz2+yz2=c2\n' + '# xz=c*cos(beta);  xy=b*cos(gamma)\n' + '# xy*xz+ly*yz=b*c*cos(alpha)\n' + '#\n\n')
         file.write('# Elements #################################\n\n' + 'Masses\n\n')
         for i in self.data['Types'].keys():
-            file.write(i + ' ' + self.data['Types'][i]['mass'] + '\n')
+            if  self.data['Types'][i]['count'] > 0:
+                file.write(str(i) + ' ' + str(self.data['Types'][i]['mass']) + '\n')
         file.write('\n' + 'Atoms\n' + '# number types charges\n')
-        for i in range(self.number_of_atoms):
-            file.write(str(i).ljust(6) + str(self.data['data'][i]['type']).ljust(4) + str(self.data['data'][i]['CHARGE']).ljust(4) + str(self.data['data'][i]['X']).ljust(12) + str(self.data['data'][i]['Y']).ljust(12) + str(self.data['data'][i]['Z']).ljust(12))
+        for i in range(1, self.number_of_atoms + 1):
+            file.write(str(i).ljust(6) + str(self.data['data'][i]['TYPE']).ljust(4) + str(self.data['data'][i]['CHARGE']).ljust(12) + str(self.data['data'][i]['X']).ljust(12) + str(self.data['data'][i]['Y']).ljust(12) + str(self.data['data'][i]['Z']) + '\n')
         file.close()
     def replace_atoms(self, type_final, ID):
         current_type = self.data['data'][ID]['TYPE']
         self.data['data'][ID]['TYPE'] = type_final
-        self.data['Types'][current_type]['count'] - = 1
+        self.data['Types'][current_type]['count'] -= 1
         self.data['Types'][current_type]['IDs'].remove(ID)
-        self.data['Types'][type_final]['count'] + = 1
+        self.data['Types'][type_final]['count'] += 1
         self.data['Types'][type_final]['IDs'].append(ID)
     def create_lammps_input_anneal(self, Input_forcefield):
         """
         This function creates the lammps input file
         :param Input_forcefield:
         """
-        s=open(self.LAMMPS_Data_file.repace('.data','') + self.simulation_ID,'w')
+        s=open(self.LAMMPS_Data_file.replace('.data','') + self.simulation_ID + '.in','w')
         #for n in lists: 
         ######
-        s.write('log ' + self.LAMMPS_Input_file.replace('.dat', '.log') + '\n')
+        #s.write('log ' + self.LAMMPS_Data_file.replace('.data', '.log') + '\n')
         s.write('# 1.- Inizialization #######################\n')
         s.write('units real\n')
         s.write('  #mass = grams/mole\n')
@@ -162,17 +167,3 @@ class MD_Analyzer(object):
         s.close()
     def consisten_plot(self):
         pass
-def create_bash_files(self):
-    for file_name in os.listdir("./"):
-        if file_name.endswith(".in"):
-            f = open(file_name[:-4] + ".sh", 'w')
-            f.write("#!/bin/bash\n" + "#SBATCH --account=def-ivanov\n" + "#SBATCH --mem=16G \n" + "#SBATCH --time=5-00:00\n" + "#SBATCH --output=Bash_"+file_name[:-4]+".log \n" + "#SBATCH --cpus-per-task=36\n\n" + "module load nixpkgs/16.09  intel/2016.4  openmpi/2.1.1 lammps/20170331\n")
-            f.write("\n lmp_exec=lmp_icc_openmpi\n")
-            f.write("lmp_input=" + "\"" + file_name + ".in\"\n")
-            f.write("lmp_output=" + "\"" + file_name[:-4] + ".lammpslog\"\n")
-            f.write("srun ${lmp_exec} < ${lmp_input} > ${lmp_output}\n")
-            f.close()
-def run_bash(self):
-    for file_name in os.listdir("./"):
-        if file_name.endswith(".sh"):
-            os.system("sbatch " + file_name)
