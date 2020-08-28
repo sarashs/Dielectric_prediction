@@ -12,11 +12,11 @@ from random import choice
 def create_bash_files():
     for file_name in os.listdir("./"):
         if file_name.endswith(".in"):
-            f = open(file_name[:-4] + ".sh", 'w')
-            f.write("#!/bin/bash\n" + "#SBATCH --account=def-ivanov\n" + "#SBATCH --mem=16G \n" + "#SBATCH --time=1-12:00\n" + "#SBATCH --output=Bash_"+file_name[:-4]+".log \n" + "#SBATCH --cpus-per-task=36\n\n" + "module load nixpkgs/16.09  intel/2016.4  openmpi/2.1.1 lammps/20170331\n")
+            f = open(file_name[:-3] + ".sh", 'w')
+            f.write("#!/bin/bash\n" + "#SBATCH --account=def-ivanov\n" + "#SBATCH --mem=16G \n" + "#SBATCH --time=1-12:00\n" + "#SBATCH --output=Bash_"+file_name[:-3]+".log \n" + "#SBATCH --cpus-per-task=36\n\n" + "module load nixpkgs/16.09  intel/2016.4  openmpi/2.1.1 lammps/20170331\n")
             f.write("\n lmp_exec=lmp_icc_openmpi\n")
-            f.write("lmp_input=" + "\"" + file_name + ".in\"\n")
-            f.write("lmp_output=" + "\"" + file_name[:-4] + ".lammpslog\"\n")
+            f.write("lmp_input=" + "\"" + file_name + "\"\n")
+            f.write("lmp_output=" + "\"" + file_name[:-3] + ".lammpslog\"\n")
             f.write("srun ${lmp_exec} < ${lmp_input} > ${lmp_output}\n")
             f.close()
 def run_bash():
@@ -35,5 +35,5 @@ for percent in percentages:
             a.replace_atoms(3, choice(a.data['Types'][2]['IDs']))
         a.save_as_lammps_data()
         a.create_lammps_input_anneal('ffield.reax')
-#create_bash_files()
-#run_bash()
+create_bash_files()
+run_bash()

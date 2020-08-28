@@ -76,7 +76,8 @@ class MD_Analyzer(object):
             if  self.data['Types'][i]['count'] > 0:
                 file.write(str(i) + ' ' + str(self.data['Types'][i]['mass']) + '\n')
         file.write('\n' + 'Atoms\n' + '# number types charges\n')
-        for i in range(1, self.number_of_atoms + 1):
+        key_list = list(self.data['data'].keys())
+        for i in key_list.sort():
             file.write(str(i).ljust(6) + str(self.data['data'][i]['TYPE']).ljust(4) + str(self.data['data'][i]['CHARGE']).ljust(12) + str(self.data['data'][i]['X']).ljust(12) + str(self.data['data'][i]['Y']).ljust(12) + str(self.data['data'][i]['Z']) + '\n')
         file.close()
     def replace_atoms(self, type_final, ID):
@@ -116,7 +117,7 @@ class MD_Analyzer(object):
         s.write('boundary p p p\n')
         s.write('atom_style charge\n\n# 2.- Atom definition ######################\n\n')
         s.write('atom_modify map hash\n')
-        s.write('read_data   '+self.LAMMPS_Data_file+'\n')
+        s.write('read_data   '+ self.LAMMPS_Data_file.replace('.data','') + self.simulation_ID + '.data'+'\n')
         s.write('\n# 3.- Force-Field ##########################\n\n')
         #Forcefield params
         s.write('pair_style reax/c NULL\n')
