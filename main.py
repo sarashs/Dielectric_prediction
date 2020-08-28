@@ -24,11 +24,11 @@ def run_bash():
         if file_name.endswith(".sh"):
             os.system("sbatch " + file_name)
        
-percentages = [2, 5, 7, 10, 12, 15, 17]
-a = MDA('atoms.data', '', columns=['ID', 'TYPE', 'CHARGE', 'X', 'Y', 'Z'])
+percentages = [2]#, 5, 7, 10, 12, 15, 17]
+a = MDA('atoms.data', '', columns=['ID', 'TYPE', 'CHARGE', '', 'X', 'Y', 'Z'])
 a.data['Types'][3] = {'mass' : 91.224, 'count' : 0, 'IDs' : []}
 for percent in percentages:
-    for num in range(10):
+    for num in range(2):
         a.LAMMPS_Data_file = 'dielectric.data'
         a.simulation_ID = 'percent_{}_number_{}'.format(percent, num)
         while (a.data['Types'][3]['count']/a.data['Types'][2]['count']) < percent/100:

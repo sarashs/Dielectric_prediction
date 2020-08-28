@@ -77,7 +77,8 @@ class MD_Analyzer(object):
                 file.write(str(i) + ' ' + str(self.data['Types'][i]['mass']) + '\n')
         file.write('\n' + 'Atoms\n' + '# number types charges\n')
         key_list = list(self.data['data'].keys())
-        for i in key_list.sort():
+        key_list.sort()
+        for i in key_list:
             file.write(str(i).ljust(6) + str(self.data['data'][i]['TYPE']).ljust(4) + str(self.data['data'][i]['CHARGE']).ljust(12) + str(self.data['data'][i]['X']).ljust(12) + str(self.data['data'][i]['Y']).ljust(12) + str(self.data['data'][i]['Z']) + '\n')
         file.close()
     def replace_atoms(self, type_final, ID):
@@ -121,7 +122,7 @@ class MD_Analyzer(object):
         s.write('\n# 3.- Force-Field ##########################\n\n')
         #Forcefield params
         s.write('pair_style reax/c NULL\n')
-        s.write('pair_coeff * * ' + Input_forcefield + ' ' + 'H O Si Zr\n')
+        s.write('pair_coeff * * ' + Input_forcefield + ' ' + 'O Si Zr\n')
         #calculate number of atom types
 
         s.write('\n'+'fix 99 all qeq/reax 1 0.0 10.0 1.0e-6 reax/c\n')
@@ -139,7 +140,7 @@ class MD_Analyzer(object):
         ##### EQUILIBRATION
         s.write('reset_timestep	0\n')
         s.write('timestep 0.1\n')
-        s.write('velocity all create 300' + str(randint(1, 500000)) + 'dist gaussian\n')
+        s.write('velocity all create 300' + str(randint(1, 500000)) + ' dist gaussian\n')
         s.write('fix MD1 all nve\n')
         s.write('dump DUMP1 all custom 1000 ' + 'equilib_' + self.LAMMPS_Data_file.replace('.data','') + self.simulation_ID + '.lammpstrj'+' id type x y z q #this size \n')
         s.write('thermo_style custom step etotal ke pe temp press pxx pyy pzz \n')
