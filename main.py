@@ -31,7 +31,7 @@ for percent in percentages:
     for num in range(10):
         a.LAMMPS_Data_file = 'dielectric.data'
         a.simulation_ID = 'percent_{}_number_{}'.format(percent, num)
-        while (a.data['Types'][3]['count']/a.number_of_atoms) < percent/100:
+        while (a.data['Types'][3]['count']/a.data['Types'][2]['count']) < percent/100:
             a.replace_atoms(3, choice(a.data['Types'][2]['IDs']))
         a.save_as_lammps_data()
         a.create_lammps_input_anneal('ffield.reax')

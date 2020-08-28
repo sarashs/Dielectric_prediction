@@ -41,8 +41,8 @@ class MD_Analyzer(object):
                         mass_info = i.split()
                         self.data['Types'][int(mass_info[0])] = {'mass' : float(mass_info[1]), 'count' : 0, 'IDs' : []}
                 if self.place_holder['Atoms'] > 0 :
-                    temp = i.strip().split()
-                    if temp[0].isdigit():
+                    if i[0].isdigit():
+                        temp = i.strip().split()
                         type_index = self.columns['TYPE']
                         charge_index = self.columns['CHARGE']
                         x_index = self.columns['X']
@@ -120,7 +120,7 @@ class MD_Analyzer(object):
         s.write('\n# 3.- Force-Field ##########################\n\n')
         #Forcefield params
         s.write('pair_style reax/c NULL\n')
-        s.write('pair_coeff * * ' + Input_forcefield + 'H O Si Zr\n')
+        s.write('pair_coeff * * ' + Input_forcefield + ' ' + 'H O Si Zr\n')
         #calculate number of atom types
 
         s.write('\n'+'fix 99 all qeq/reax 1 0.0 10.0 1.0e-6 reax/c\n')
