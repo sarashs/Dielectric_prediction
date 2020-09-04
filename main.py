@@ -13,7 +13,7 @@ def create_bash_files():
     for file_name in os.listdir("./"):
         if file_name.endswith(".in"):
             f = open(file_name[:-3] + ".sh", 'w')
-            f.write("#!/bin/bash\n" + "#SBATCH --account=def-ivanov\n" + "#SBATCH --mem=32G \n" + "#SBATCH --time=7-00:00\n" + "#SBATCH --output=Bash_"+file_name[:-3]+".log \n" + "#SBATCH --cpus-per-task=32\n\n" + "module load nixpkgs/16.09  intel/2016.4  openmpi/2.1.1 lammps/20170331\n")
+            f.write("#!/bin/bash\n" + "#SBATCH --account=def-ivanov\n" + "#SBATCH --mem=32G \n" + "#SBATCH --time=5-00:00\n" + "#SBATCH --output=Bash_"+file_name[:-3]+".log \n" + "#SBATCH --cpus-per-task=48\n\n" + "module load nixpkgs/16.09  intel/2016.4  openmpi/2.1.1 lammps/20170331\n")
             f.write("\n" + "lmp_exec=lmp_mpi\n")
             f.write("lmp_input=" + "\"" + file_name + "\"\n")
             f.write("lmp_output=" + "\"" + file_name[:-3] + ".lammpslog\"\n")
