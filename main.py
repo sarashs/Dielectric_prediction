@@ -24,16 +24,23 @@ def run_bash():
         if file_name.endswith(".sh"):
             os.system("sbatch " + file_name)
        
-percentages = [2, 5, 7, 10, 12, 15, 17]
-a = MDA('atoms.data', '', columns=['ID', 'TYPE', 'CHARGE', '', 'X', 'Y', 'Z'])
-a.data['Types'][3] = {'mass' : 91.224, 'count' : 0, 'IDs' : []}
-for percent in percentages:
-    for num in range(10):
-        a.LAMMPS_Data_file = 'dielectric.data'
-        a.simulation_ID = 'percent_{}_number_{}'.format(percent, num)
-        while (a.data['Types'][3]['count']/a.data['Types'][2]['count']) < percent/100:
-            a.replace_atoms(3, choice(a.data['Types'][2]['IDs']))
-        a.save_as_lammps_data()
-        a.create_lammps_input_anneal('ffield.reax')
-create_bash_files()
-run_bash()
+#percentages = [2, 5, 7, 10, 12, 15, 17]
+#a = MDA('anneal_dielectricpercent_2_number_0.lammpstrj', '', columns=['ID', 'TYPE', 'X', 'Y', 'Z', 'CHARGE'])
+#a.data['Types'][3] = {'mass' : 91.224, 'count' : 0, 'IDs' : []}
+#for percent in percentages:
+#    for num in range(10):
+#        a.LAMMPS_Data_file = 'dielectric.data'
+#        a.simulation_ID = 'percent_{}_number_{}'.format(percent, num)
+#        while (a.data['Types'][3]['count']/a.data['Types'][2]['count']) < percent/100:
+#            a.replace_atoms(3, choice(a.data['Types'][2]['IDs']))
+#        a.save_as_lammps_data()
+#        a.create_lammps_input('ffield.reax')
+#create_bash_files()
+#run_bash()
+            
+a = MDA('anneal_dielectricpercent_2_number_0.lammpstrj', '', columns=['ID', 'TYPE', 'X', 'Y', 'Z', 'CHARGE'])
+a.data['Types'][1]['mass'] = 15.9994
+a.data['Types'][2]['mass'] = 28.0860
+a.data['Types'][3]['mass'] = 91.224
+a.save_as_lammps_data()
+a.create_lammps_input('ffield.reax', type_of_simulation = 'fluctuation', fluctuation_duration = 5000000)

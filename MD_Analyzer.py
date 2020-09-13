@@ -15,6 +15,37 @@ class MD_Analyzer(object):
         self.place_holder = {'Dimensions' : 0, 'Masses' : 0, 'Atoms' : 0}
         self.data = {'Dimensions' : [0, 0, 0], 'Types' : {1 : {'mass' : 0, 'count' : 0, 'IDs' : []}}, 'data' : {1 : {'TYPE' : 0, 'CHARGE' : 0, 'X' : 0, 'Y' : 0, 'Z' : 0}}} 
         self.columns = {j : i for i,j in enumerate(columns)}
+        self.last_timestep_index = 0
+        if Trajectory_file_name.endswith('.lammpstrj'):
+            self.LAMMPS_Data_file = Trajectory_file_name.replace('.lammpstrj','.data')
+            self.file = open(Trajectory_file_name, 'r')
+            self.lines = self.file.readlines()
+            last_timestep = 0
+            for i in range(len(self.lines)):
+                if "ITEM: TIMESTEP" in self.lines[i]:
+                    if int(self.lines[i+1].replace(' ','')) > last_timestep:
+                        last_timestep = int(self.lines[i+1].replace(' ',''))
+                        self.last_timestep_index = i
+                self.number_of_atoms = int(self.lines[self.last_timestep_index + 3].replace(' ',''))
+                x_dim = self.lines[self.last_timestep_index + 5].split()
+                y_dim = self.lines[self.last_timestep_index + 7].split() 
+                z_dim = self.lines[self.last_timestep_index + 6].split() 
+                self.data['Dimensions'] = [float(x_dim[1]) - float(x_dim[0]), float(y_dim[1]) - float(y_dim[0]), float(z_dim[1]) - float(z_dim[0])]
+            for i in range(self.last_timestep_index + 9, self.last_timestep_index + self.number_of_atoms + 1):
+                temp = self.lines[i].split()
+                if int(temp[self.columns['TYPE']]) in list(self.data['Types'].keys()):
+                    self.data['Types'][int(temp[self.columns['TYPE']])]['count'] += 1
+                    self.data['Types'][int(temp[self.columns['TYPE']])]['IDs'].append(int(temp[self.columns['ID']]))
+                else:
+                    self.data['Types'][int(temp[self.columns['TYPE']])] = {'mass' : 0, 'count' : 1, 'IDs' : [int(temp[self.columns['ID']])]}
+                self.data['data'][int(temp[self.columns['ID']])] = {}
+                self.data['data'][int(temp[self.columns['ID']])]['TYPE'] = int(temp[self.columns['TYPE']]) 
+                self.data['data'][int(temp[self.columns['ID']])]['CHARGE'] = float(temp[self.columns['CHARGE']])
+                self.data['data'][int(temp[self.columns['ID']])]['X'] = float(temp[self.columns['X']])
+                self.data['data'][int(temp[self.columns['ID']])]['Y'] = float(temp[self.columns['Y']])
+                self.data['data'][int(temp[self.columns['ID']])]['Z'] = float(temp[self.columns['Z']])
+            self.file.close()
+                
         if Trajectory_file_name.endswith('.data'):
             self.LAMMPS_Data_file = Trajectory_file_name
             self.file = open(Trajectory_file_name, 'r')
@@ -60,8 +91,6 @@ class MD_Analyzer(object):
                             self.data['data'][ID] = {'TYPE' : int(temp[type_index]), 'CHARGE' : float(temp[charge_index]), 'X' : float(temp[x_index]), 'Y' : float(temp[y_index]), 'Z' : float(temp[z_index])}
 
             self.file.close()
-        elif Trajectory_file_name.endswith('.lammpstrj'):
-            self.LAMMPS_Data_file = Trajectory_file_name.replace('.lammpstrj', '.data')
         self.simulation_ID = simulation_ID
         self.updated_lines = self.lines
     def Magnetic_fluctuation(self, number_of_time_steps):
@@ -88,7 +117,7 @@ class MD_Analyzer(object):
         self.data['Types'][current_type]['IDs'].remove(ID)
         self.data['Types'][type_final]['count'] += 1
         self.data['Types'][type_final]['IDs'].append(ID)
-    def create_lammps_input_anneal(self, Input_forcefield):
+    def create_lammps_input(self, Input_forcefield, type_of_simulation = 'anneal', **kwargs):
         """
         This function creates the lammps input file
         :param Input_forcefield:
@@ -138,6 +167,10 @@ class MD_Analyzer(object):
         s.write('minimize 1.0e-5 1.0e-6 2000 2000\n')
         s.write('undump DUMP2\n')
         ##### EQUILIBRATION
+        if 'equiliberation_duration' in kwargs.keys():
+            equiliberation_duration = kwargs['equiliberation_duration']
+        else:
+            equiliberation_duration = 200000
         s.write('reset_timestep	0\n')
         s.write('timestep 0.1\n')
         s.write('velocity all create 300 ' + str(randint(1, 500000)) + ' rot yes mom yes dist gaussian\n')
@@ -146,37 +179,51 @@ class MD_Analyzer(object):
         s.write('dump DUMP1 all custom 10000 ' + 'equilib_' + self.LAMMPS_Data_file.replace('.data','') + self.simulation_ID + '.lammpstrj'+' id type x y z q #this size \n')
         s.write('thermo_style custom step etotal ke pe temp press pxx pyy pzz \n')
         s.write('thermo 1000\n')
-        s.write('run 200000\n')
+        s.write(f'run {equiliberation_duration}\n')
         s.write('unfix 10\n')
         s.write('unfix MD1\n')
         s.write('fix MD2 all npt temp 300 300 20 aniso 1.0 1.0 50.0\n')
-        s.write('run 200000\n')
+        s.write(f'run {equiliberation_duration}\n')
         s.write('unfix MD2\n')
         s.write('undump DUMP1\n')
         ##### Anneal
-        s.write('reset_timestep	0\n')
-        s.write('fix MD3 all npt temp 300 3000 20 aniso 1.0 1.0 100.0\n')
-        s.write('dump DUMP3 all custom 10000 ' + 'anneal_' + self.LAMMPS_Data_file.replace('.data','') + self.simulation_ID + '.lammpstrj'+' id type x y z q #this size \n')
-        s.write('thermo_style custom step etotal ke pe temp press pxx pyy pzz \n')
-        s.write('thermo 1000\n')
-        s.write('run 100000\n')
-        s.write('unfix MD3\n')
-        s.write('fix MD4 all npt temp 3000 300 20 aniso 1.0 1.0 100.0\n')
-        s.write('run 900000\n')
-        s.write('unfix MD4\n')
-        s.write('fix MD5 all npt temp 300 300 20 aniso 1.0 1.0 20.0\n')
-        s.write('run 100000\n')
-        s.write('unfix MD5\n')
-        s.write('undump DUMP3\n')
+        if type_of_simulation in 'anneal':
+            if 'anneal_duration' in kwargs.keys():
+                anneal_duration = kwargs['anneal_duration']
+            else:
+                anneal_duration = 900000
+            s.write('reset_timestep	0\n')
+            s.write('fix MD3 all npt temp 300 3000 20 aniso 1.0 1.0 100.0\n')
+            s.write('dump DUMP3 all custom 10000 ' + 'anneal_' + self.LAMMPS_Data_file.replace('.data','') + self.simulation_ID + '.lammpstrj'+' id type x y z q #this size \n')
+            s.write('thermo_style custom step etotal ke pe temp press pxx pyy pzz \n')
+            s.write('thermo 1000\n')
+            s.write('run 100000\n')
+            s.write('unfix MD3\n')
+            s.write('fix MD4 all npt temp 3000 300 20 aniso 1.0 1.0 100.0\n')
+            s.write(f'run {anneal_duration}\n')
+            s.write('unfix MD4\n')
+            s.write('fix MD5 all npt temp 300 300 20 aniso 1.0 1.0 20.0\n')
+            s.write('run 100000\n')
+            s.write('unfix MD5\n')
+            s.write('undump DUMP3\n')
         # fluctuate
-        #s.write('reset_timestep	0\n')
-        #s.write('fix MD6 all nvt temp 300 300 20.0\n')
-        #s.write('dump DUMP4 all custom 5000 ' + 'fluctuate_' + self.LAMMPS_Data_file.replace('.data','') + self.simulation_ID + '.lammpstrj'+' id type x y z q #this size \n')
-        #s.write('thermo_style custom step etotal ke pe temp press pxx pyy pzz \n')
-        #s.write('thermo 1000\n')
-        #s.write('run 10000000\n')
-        #s.write('unfix MD6\n')
-        #s.write('undump DUMP4\n')
+        if type_of_simulation in 'fluctuation':
+            if 'fluctuation_duration' in kwargs.keys():
+                fluctuation_duration = kwargs['fluctuation_duration']
+            else:
+                fluctuation_duration = 4500000
+            if 'fluctuation_thermo_duration' in kwargs.keys():
+                fluctuation_thermo_duration = kwargs['fluctuation_thermo_duration']
+            else:
+                fluctuation_thermo_duration = 1000
+            s.write('reset_timestep	0\n')
+            s.write('fix MD6 all nvt temp 300 300 20.0\n')
+            s.write('dump DUMP4 all custom 5000 ' + 'fluctuate_' + self.LAMMPS_Data_file.replace('.data','') + self.simulation_ID + '.lammpstrj'+' id type x y z q #this size \n')
+            s.write('thermo_style custom step etotal ke pe temp press pxx pyy pzz \n')
+            s.write(f'thermo {fluctuation_thermo_duration}\n')
+            s.write(f'run {fluctuation_duration}\n')
+            s.write('unfix MD6\n')
+            s.write('undump DUMP4\n')
         s.close()
     def consisten_plot(self):
         pass
