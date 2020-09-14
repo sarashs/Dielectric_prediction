@@ -217,6 +217,7 @@ class MD_Analyzer(object):
             else:
                 fluctuation_thermo_duration = 1000
             s.write('reset_timestep	0\n')
+            s.write('restart 500000' + self.LAMMPS_Data_file.replace('.data','') + self.simulation_ID + '.restart\n')
             s.write('fix MD6 all nvt temp 300 300 20.0\n')
             s.write('dump DUMP4 all custom 5000 ' + 'fluctuate_' + self.LAMMPS_Data_file.replace('.data','') + self.simulation_ID + '.lammpstrj'+' id type x y z q #this size \n')
             s.write('thermo_style custom step etotal ke pe temp press pxx pyy pzz \n')

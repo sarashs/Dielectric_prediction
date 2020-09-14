@@ -13,7 +13,7 @@ def create_bash_files():
     for file_name in os.listdir("./"):
         if file_name.endswith(".in"):
             f = open(file_name[:-3] + ".sh", 'w')
-            f.write("#!/bin/bash\n" + "#SBATCH --account=def-ivanov\n" + "#SBATCH --time=1-00:00\n" + "#SBATCH --nodes=2\n" + "#SBATCH --ntasks=80\n\n" + "module load intel/2019u3  intelmpi/2019u3  lammps/29Mar2019\n")
+            f.write("#!/bin/bash\n" + "#SBATCH --account=def-ivanov\n" + "#SBATCH --time=1-00:00\n" + "#SBATCH --nodes=2\n" + "#SBATCH --ntasks=160\n\n" + "module load intel/2019u3  intelmpi/2019u3  lammps/29Mar2019\n")
             f.write("\n" + "lmp_exec=lammps\n")
             f.write("lmp_input=" + "\"" + file_name + "\"\n")
             f.write("lmp_output=" + "\"" + file_name[:-3] + ".lammpslog\"\n")
@@ -37,10 +37,14 @@ def run_bash():
 #        a.create_lammps_input('ffield.reax')
 #create_bash_files()
 #run_bash()
-            
-a = MDA('anneal_dielectricpercent_2_number_0.lammpstrj', '', columns=['ID', 'TYPE', 'X', 'Y', 'Z', 'CHARGE'])
-a.data['Types'][1]['mass'] = 15.9994
-a.data['Types'][2]['mass'] = 28.0860
-a.data['Types'][3]['mass'] = 91.224
-a.save_as_lammps_data()
-a.create_lammps_input('ffield.reax', type_of_simulation = 'fluctuation', fluctuation_duration = 5000000)
+#####################################################
+for file_name in os.listdir("./"):
+    if file_name.endswith(".lammpstrj"):            
+        a = MDA(file_name, '', columns=['ID', 'TYPE', 'X', 'Y', 'Z', 'CHARGE'])
+        a.data['Types'][1]['mass'] = 15.9994
+        a.data['Types'][2]['mass'] = 28.0860
+        a.data['Types'][3]['mass'] = 91.224
+        a.save_as_lammps_data()
+        a.create_lammps_input('ffield.reax', type_of_simulation = 'fluctuation', fluctuation_duration = 5000000)
+create_bash_files()
+run_bash()
