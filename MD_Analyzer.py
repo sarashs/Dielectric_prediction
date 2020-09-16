@@ -28,10 +28,10 @@ class MD_Analyzer(object):
                         self.last_timestep_index = i
                 self.number_of_atoms = int(self.lines[self.last_timestep_index + 3].replace(' ',''))
                 x_dim = self.lines[self.last_timestep_index + 5].split()
-                y_dim = self.lines[self.last_timestep_index + 7].split() 
-                z_dim = self.lines[self.last_timestep_index + 6].split() 
+                y_dim = self.lines[self.last_timestep_index + 6].split() 
+                z_dim = self.lines[self.last_timestep_index + 7].split() 
                 self.data['Dimensions'] = [float(x_dim[1]) - float(x_dim[0]), float(y_dim[1]) - float(y_dim[0]), float(z_dim[1]) - float(z_dim[0])]
-            for i in range(self.last_timestep_index + 9, self.last_timestep_index + self.number_of_atoms + 1):
+            for i in range(self.last_timestep_index + 9, self.last_timestep_index + 9 + self.number_of_atoms):
                 temp = self.lines[i].split()
                 if int(temp[self.columns['TYPE']]) in list(self.data['Types'].keys()):
                     self.data['Types'][int(temp[self.columns['TYPE']])]['count'] += 1
@@ -215,10 +215,10 @@ class MD_Analyzer(object):
             if 'fluctuation_thermo_duration' in kwargs.keys():
                 fluctuation_thermo_duration = kwargs['fluctuation_thermo_duration']
             else:
-                fluctuation_thermo_duration = 1000
+                fluctuation_thermo_duration = 10000
             s.write('reset_timestep	0\n')
-            s.write('restart 500000' + self.LAMMPS_Data_file.replace('.data','') + self.simulation_ID + '.restart\n')
-            s.write('fix MD6 all nvt temp 300 300 20.0\n')
+            s.write('restart 500000 ' + self.LAMMPS_Data_file.replace('.data','') + self.simulation_ID + '.restart\n')
+            s.write('fix MD6 all nvt temp 300 300 100.0\n')
             s.write('dump DUMP4 all custom 5000 ' + 'fluctuate_' + self.LAMMPS_Data_file.replace('.data','') + self.simulation_ID + '.lammpstrj'+' id type x y z q #this size \n')
             s.write('thermo_style custom step etotal ke pe temp press pxx pyy pzz \n')
             s.write(f'thermo {fluctuation_thermo_duration}\n')

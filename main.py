@@ -45,6 +45,6 @@ for file_name in os.listdir("./"):
         a.data['Types'][2]['mass'] = 28.0860
         a.data['Types'][3]['mass'] = 91.224
         a.save_as_lammps_data()
-        a.create_lammps_input('ffield.reax', type_of_simulation = 'fluctuation', fluctuation_duration = 5000000)
+        a.create_lammps_input('ffield.reax', type_of_simulation = 'fluctuation', equiliberation_duration = 100000, fluctuation_duration = 100000000)
 create_bash_files()
 run_bash()
