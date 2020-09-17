@@ -17,21 +17,32 @@ class MD_Analyzer(object):
         self.columns = {j : i for i,j in enumerate(columns)}
         self.last_timestep_index = 0
         self.magnetic_moment = 0 #total magnetic moment of the device
-        if Trajectory_file_name.endswith('.lammpstrj'):
-            self.LAMMPS_Data_file = Trajectory_file_name.replace('.lammpstrj','.data')
-            self.file = open(Trajectory_file_name, 'r')
+        self.Trajectory_file_name = Trajectory_file_name
+        self.read_data(time_step = -1)
+        self.simulation_ID = simulation_ID
+        self.updated_lines = self.lines
+    def read_data(self, time_step = -1):
+        # By default the last timestep will be read
+        if self.Trajectory_file_name.endswith('.lammpstrj'):
+            self.LAMMPS_Data_file = self.Trajectory_file_name.replace('.lammpstrj','.data')
+            self.file = open(self.Trajectory_file_name, 'r')
             self.lines = self.file.readlines()
             last_timestep = 0
             for i in range(len(self.lines)):
                 if "ITEM: TIMESTEP" in self.lines[i]:
-                    if int(self.lines[i+1].replace(' ','')) > last_timestep:
-                        last_timestep = int(self.lines[i+1].replace(' ',''))
-                        self.last_timestep_index = i
-                self.number_of_atoms = int(self.lines[self.last_timestep_index + 3].replace(' ',''))
-                x_dim = self.lines[self.last_timestep_index + 5].split()
-                y_dim = self.lines[self.last_timestep_index + 6].split() 
-                z_dim = self.lines[self.last_timestep_index + 7].split() 
-                self.data['Dimensions'] = [float(x_dim[1]) - float(x_dim[0]), float(y_dim[1]) - float(y_dim[0]), float(z_dim[1]) - float(z_dim[0])]
+                    if time_step == -1:
+                        if int(self.lines[i+1].replace(' ','')) > last_timestep:
+                            last_timestep = int(self.lines[i+1].replace(' ',''))
+                            self.last_timestep_index = i
+                    else:
+                        if int(self.lines[i+1].replace(' ','')) = time_step:
+                            last_timestep = int(self.lines[i+1].replace(' ',''))
+                            self.last_timestep_index = i    
+                    self.number_of_atoms = int(self.lines[self.last_timestep_index + 3].replace(' ',''))
+                    x_dim = self.lines[self.last_timestep_index + 5].split()
+                    y_dim = self.lines[self.last_timestep_index + 6].split() 
+                    z_dim = self.lines[self.last_timestep_index + 7].split() 
+                    self.data['Dimensions'] = [float(x_dim[1]) - float(x_dim[0]), float(y_dim[1]) - float(y_dim[0]), float(z_dim[1]) - float(z_dim[0])]
             for i in range(self.last_timestep_index + 9, self.last_timestep_index + 9 + self.number_of_atoms):
                 temp = self.lines[i].split()
                 if int(temp[self.columns['TYPE']]) in list(self.data['Types'].keys()):
@@ -47,9 +58,9 @@ class MD_Analyzer(object):
                 self.data['data'][int(temp[self.columns['ID']])]['Z'] = float(temp[self.columns['Z']])
             self.file.close()
                 
-        if Trajectory_file_name.endswith('.data'):
-            self.LAMMPS_Data_file = Trajectory_file_name
-            self.file = open(Trajectory_file_name, 'r')
+        if self.Trajectory_file_name.endswith('.data'):
+            self.LAMMPS_Data_file = self.Trajectory_file_name
+            self.file = open(self.Trajectory_file_name, 'r')
             self.lines = self.file.readlines()
             for j, i in enumerate(self.lines):
                 if ' atoms' in i:
@@ -92,15 +103,36 @@ class MD_Analyzer(object):
                             self.data['data'][ID] = {'TYPE' : int(temp[type_index]), 'CHARGE' : float(temp[charge_index]), 'X' : float(temp[x_index]), 'Y' : float(temp[y_index]), 'Z' : float(temp[z_index])}
 
             self.file.close()
-        self.simulation_ID = simulation_ID
-        self.updated_lines = self.lines
-    def read_data(self, time_step):
-        pass
-    def Magnetic_moment(self, Time_step):
-        pass
-    def Magnetic_fluctuation(self, init_timestep, number_of_time_steps):
-        pass
-    def save_as_lammps_data(self):
+    def perioicboundary(self, x, y, z):
+        output = [x, y, z]
+        for num,item in enumerate([x, y, z]):
+        if abs(item) >= self.data['Dimensions'][num]/2:
+            if item >= 0:
+                output[i] -= self.data['Dimensions'][num]/2
+            else:
+                output[i] += self.data['Dimensions'][num]/2
+    def Dipole_moment_square(self, time_step):
+        MF = 0
+        temp = [0, 0, 0]
+        self.read_data(time_step)
+        for i in range(1, self.number_of_atoms + 1):
+            temp = [j*self.data['data'][i]['CHARGE']/2+k for j,k in zip(self.perioicboundary(data['data'][i]['X'], data['data'][i]['Y'], data['data'][i]['Z']), temp)]
+        MF = sum([j**2 for j in temp])
+        return MF
+    def Dipole_moment_fluctuation(self, init_timestep, span_timestep, final_timestep):
+        current_timestep = init_timestep
+        DMF = Dipole_moment_square(current_timestep)
+        num = 1
+        while current_timestep < final_timestep:
+            num += 1
+            current_timestep += span_timestep
+            DMF += Dipole_moment_square(current_timestep)
+        DMF = DMF / num
+        return DMF
+    def save_as_lammps_data(self, time_step = -1):
+        # By default the last timestep will be read
+        if timestep != 1:
+            self.read_data(time_step)
         file = open(self.LAMMPS_Data_file.replace('.data','') + self.simulation_ID + '.data', 'w')
         file.write('# System description #######################\n' + '#\n\n' + str(self.number_of_atoms) + ' atoms\n' + str(len(list(self.data['Types'].keys()))) + ' atom types\n')
         file.write('0 ' + str(self.data['Dimensions'][0]) + ' xlo xhi\n' + '0 ' + str(self.data['Dimensions'][1]) + ' ylo yhi\n' + '0 ' + str(self.data['Dimensions'][2]) + ' zlo zhi\n')
