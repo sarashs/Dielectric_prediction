@@ -16,6 +16,7 @@ class MD_Analyzer(object):
         self.data = {'Dimensions' : [0, 0, 0], 'Types' : {1 : {'mass' : 0, 'count' : 0, 'IDs' : []}}, 'data' : {1 : {'TYPE' : 0, 'CHARGE' : 0, 'X' : 0, 'Y' : 0, 'Z' : 0}}} 
         self.columns = {j : i for i,j in enumerate(columns)}
         self.last_timestep_index = 0
+        self.magnetic_moment = 0 #total magnetic moment of the device
         if Trajectory_file_name.endswith('.lammpstrj'):
             self.LAMMPS_Data_file = Trajectory_file_name.replace('.lammpstrj','.data')
             self.file = open(Trajectory_file_name, 'r')
@@ -93,7 +94,11 @@ class MD_Analyzer(object):
             self.file.close()
         self.simulation_ID = simulation_ID
         self.updated_lines = self.lines
-    def Magnetic_fluctuation(self, number_of_time_steps):
+    def read_data(self, time_step):
+        pass
+    def Magnetic_moment(self, Time_step):
+        pass
+    def Magnetic_fluctuation(self, init_timestep, number_of_time_steps):
         pass
     def save_as_lammps_data(self):
         file = open(self.LAMMPS_Data_file.replace('.data','') + self.simulation_ID + '.data', 'w')
@@ -218,7 +223,7 @@ class MD_Analyzer(object):
                 fluctuation_thermo_duration = 10000
             s.write('reset_timestep	0\n')
             s.write('restart 500000 ' + self.LAMMPS_Data_file.replace('.data','') + self.simulation_ID + '.restart\n')
-            s.write('fix MD6 all nvt temp 300 300 100.0\n')
+            s.write('fix MD6 all nvt temp 300 300 50.0\n')
             s.write('dump DUMP4 all custom 5000 ' + 'fluctuate_' + self.LAMMPS_Data_file.replace('.data','') + self.simulation_ID + '.lammpstrj'+' id type x y z q #this size \n')
             s.write('thermo_style custom step etotal ke pe temp press pxx pyy pzz \n')
             s.write(f'thermo {fluctuation_thermo_duration}\n')
