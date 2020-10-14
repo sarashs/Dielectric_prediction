@@ -47,4 +47,4 @@ for file_name in os.listdir("./"):
         a.save_as_lammps_data()
         a.create_lammps_input('ffield.reax', type_of_simulation = 'fluctuation', equiliberation_duration = 100000, fluctuation_duration = 100000000)
 create_bash_files()
-run_bash()
+#run_bash()
