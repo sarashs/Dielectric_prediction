@@ -5,6 +5,15 @@ Created on Sun Aug 23 11:53:44 2020
 @author: sarashs
 """
 from random import randint
+from matplotlib import pyplot as plot
+import time
+import numpy as np
+
+Kb = 1.380649e-23
+ε0 = 8.8541878128e-12
+e_charge = 1.602176634e-19
+Angstrom = 1e-10
+coef = e_charge**2 / (ε0 * Kb * Angstrom)
 
 class MD_Analyzer(object):
     """This is a python class for analyzing LAMMPS outputs
@@ -21,6 +30,7 @@ class MD_Analyzer(object):
         self.read_data(time_step = -1)
         self.simulation_ID = simulation_ID
         self.updated_lines = self.lines
+        self.time_step = 0
     def read_data(self, time_step = -1):
         # By default the last timestep will be read
         if self.Trajectory_file_name.endswith('.lammpstrj'):
@@ -35,9 +45,10 @@ class MD_Analyzer(object):
                             last_timestep = int(self.lines[i+1].replace(' ',''))
                             self.last_timestep_index = i
                     else:
-                        if int(self.lines[i+1].replace(' ','')) = time_step:
+                        if int(self.lines[i+1].replace(' ','')) == time_step:
                             last_timestep = int(self.lines[i+1].replace(' ',''))
-                            self.last_timestep_index = i    
+                            self.last_timestep_index = i  
+                    self.time_step = int(self.lines[self.last_timestep_index + 1].replace(' ',''))
                     self.number_of_atoms = int(self.lines[self.last_timestep_index + 3].replace(' ',''))
                     x_dim = self.lines[self.last_timestep_index + 5].split()
                     y_dim = self.lines[self.last_timestep_index + 6].split() 
@@ -103,35 +114,47 @@ class MD_Analyzer(object):
                             self.data['data'][ID] = {'TYPE' : int(temp[type_index]), 'CHARGE' : float(temp[charge_index]), 'X' : float(temp[x_index]), 'Y' : float(temp[y_index]), 'Z' : float(temp[z_index])}
 
             self.file.close()
-    def perioicboundary(self, x, y, z):
-        output = [x, y, z]
-        for num,item in enumerate([x, y, z]):
-        if abs(item) >= self.data['Dimensions'][num]/2:
-            if item >= 0:
-                output[i] -= self.data['Dimensions'][num]/2
-            else:
-                output[i] += self.data['Dimensions'][num]/2
-    def Dipole_moment_square(self, time_step):
+    def periodic_condition(self, inputs):
+        output = inputs
+        for i,j in enumerate(output):
+            if abs(output[i]) >= self.data['Dimensions'][i] / 2:
+                if output[i] >= 0:
+                    output[i] -= self.data['Dimensions'][i] / 2
+                else:
+                    output[i] += self.data['Dimensions'][i] / 2
+        return output
+    def Dipole_moment(self, time_step, radius):
         MF = 0
         temp = [0, 0, 0]
         self.read_data(time_step)
         for i in range(1, self.number_of_atoms + 1):
-            temp = [j*self.data['data'][i]['CHARGE']/2+k for j,k in zip(self.perioicboundary(data['data'][i]['X'], data['data'][i]['Y'], data['data'][i]['Z']), temp)]
-        MF = sum([j**2 for j in temp])
+            atom = self.periodic_condition([self.data['data'][i]['X'], self.data['data'][i]['Y'], self.data['data'][i]['Z']])
+            if np.linalg.norm(atom) < radius:
+                temp = [k*self.data['data'][i]['CHARGE']+temp[j] for j,k in enumerate(atom)]
+        MF = np.linalg.norm(temp)
         return MF
-    def Dipole_moment_fluctuation(self, init_timestep, span_timestep, final_timestep):
+    def Dipole_moment_fluctuation(self, init_timestep, span_timestep, final_timestep, T):
+        start =  time.time()
         current_timestep = init_timestep
-        DMF = Dipole_moment_square(current_timestep)
+        DMF = self.Dipole_moment(current_timestep, 10)
+        DMF2 = DMF ** 2
+        DMF_list = []
         num = 1
+        c = coef / (3 * T)
         while current_timestep < final_timestep:
             num += 1
             current_timestep += span_timestep
-            DMF += Dipole_moment_square(current_timestep)
-        DMF = DMF / num
-        return DMF
+            MF = self.Dipole_moment(current_timestep, 10)
+            DMF += MF
+            DMF2 += MF ** 2
+            beta = c * (DMF2 / num - (DMF / num) ** 2)  / (np.pi * 4 * 1000)
+            DMF_list.append(((1 + 3 * beta) + ((1 + 3 * beta)**2 + 8)**0.5)/4)
+        end = time.time()
+        print(f'it took {end - start} seconds.')
+        return DMF_list
     def save_as_lammps_data(self, time_step = -1):
         # By default the last timestep will be read
-        if timestep != 1:
+        if time_step != 1:
             self.read_data(time_step)
         file = open(self.LAMMPS_Data_file.replace('.data','') + self.simulation_ID + '.data', 'w')
         file.write('# System description #######################\n' + '#\n\n' + str(self.number_of_atoms) + ' atoms\n' + str(len(list(self.data['Types'].keys()))) + ' atom types\n')
@@ -254,6 +277,7 @@ class MD_Analyzer(object):
             else:
                 fluctuation_thermo_duration = 10000
             s.write('reset_timestep	0\n')
+            s.write('timestep 1\n')
             s.write('restart 500000 ' + self.LAMMPS_Data_file.replace('.data','') + self.simulation_ID + '.restart\n')
             s.write('fix MD6 all nvt temp 300 300 50.0\n')
             s.write('dump DUMP4 all custom 5000 ' + 'fluctuate_' + self.LAMMPS_Data_file.replace('.data','') + self.simulation_ID + '.lammpstrj'+' id type x y z q #this size \n')
@@ -263,5 +287,16 @@ class MD_Analyzer(object):
             s.write('unfix MD6\n')
             s.write('undump DUMP4\n')
         s.close()
-    def consisten_plot(self):
-        pass
+    def consistent_plot(self,X, Y, labels, formats, alphas, xlabel, ylabel, title, save_name):
+        """The arguments are all lists!"""
+        for i, j in enumerate(labels):
+            plot.plot(X[i], Y[i], formats[i], alpha = alphas[i], markersize=10.0,linewidth=2.0,label = labels[i])
+        plot.xlabel(xlabe, fontsize = 14)
+        plot.ylabel(ylabe, fontsize = 14)
+        plot.xticks(fontsize = 14)
+        plot.yticks(fontsize = 14)
+        plot.title(title, fontsize=14)
+        plot.legend(fontsize=14)
+        plot.grid()
+        plot.savefig(save_name + '.png')
+        plot.show()
