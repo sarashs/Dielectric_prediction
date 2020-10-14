@@ -41,6 +41,13 @@ def run_bash():
 for file_name in os.listdir("./"):
     if file_name.endswith(".lammpstrj"):            
         a = MDA(file_name, '', columns=['ID', 'TYPE', 'X', 'Y', 'Z', 'CHARGE'])
+        a.restart_fluctuate(18500000)
+create_bash_files()
+run_bash()
+#######################
+for file_name in os.listdir("./"):
+    if file_name.endswith(".lammpstrj"):            
+        a = MDA(file_name, '', columns=['ID', 'TYPE', 'X', 'Y', 'Z', 'CHARGE'])
         a.data['Types'][1]['mass'] = 15.9994
         a.data['Types'][2]['mass'] = 28.0860
         a.data['Types'][3]['mass'] = 91.224

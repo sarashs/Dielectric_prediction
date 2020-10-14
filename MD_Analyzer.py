@@ -287,14 +287,14 @@ class MD_Analyzer(object):
             s.write('unfix MD6\n')
             s.write('undump DUMP4\n')
         s.close()
-    def restart_fluctuate(self, **kwargs):
+    def restart_fluctuate(self, time_step, **kwargs):
         """
         This function creates the lammps input file
         :param Input_forcefield:
         """
-        s=open(self.LAMMPS_Data_file.replace('.data','') + self.simulation_ID + '.in','w')
+        s=open(self.Trajectory_file_name('.lammpstrj','') + '.in','w')
         s.write('# 1.- Inizialization #######################\n')
-        s.write('read_restart ' + self.LAMMPS_Data_file.replace('.data','') + self.simulation_ID + '.restart\n')
+        s.write('read_restart ' + self.Trajectory_file_name('.lammpstrj','.') + str(time_step) + '.restart\n')
 
         s.write('\n'+'fix 99 all qeq/reax 1 0.0 10.0 1.0e-6 reax/c\n')
         s.write('neighbor        2.0 bin\n')
@@ -311,9 +311,9 @@ class MD_Analyzer(object):
             fluctuation_thermo_duration = 10000
         s.write('reset_timestep	0\n')
         s.write('timestep 0.5\n')
-        s.write('restart 500000 ' + self.LAMMPS_Data_file.replace('.data','') + self.simulation_ID + '.restart\n')
+        s.write('restart 500000 ' + self.Trajectory_file_name('.lammpstrj','') + '.restart\n')
         s.write('fix MD6 all nvt temp 300 300 50.0\n')
-        s.write('dump DUMP4 all custom 20000 ' + 'fluctuate_' + self.LAMMPS_Data_file.replace('.data','') + self.simulation_ID + '.lammpstrj'+' id type x y z q #this size \n')
+        s.write('dump DUMP4 all custom 20000 ' + 'fluctuate_' + self.Trajectory_file_name +' id type x y z q #this size \n')
         s.write('thermo_style custom step etotal ke pe temp press pxx pyy pzz \n')
         s.write(f'thermo {fluctuation_thermo_duration}\n')
         s.write(f'run {fluctuation_duration}\n')
