@@ -39,19 +39,20 @@ def run_bash():
 #run_bash()
 #######################
 for file_name in os.listdir("./"):
-    if file_name.endswith(".lammpstrj") and file_name.startswith('anneal_dielectricpercent'):            
-        a = MDA(file_name, '', columns=['ID', 'TYPE', 'X', 'Y', 'Z', 'CHARGE'])
-        a.restart_fluctuate(3000000)
+    if file_name.endswith('lammpstrj') and file_name.startswith('anneal'):            
+        print('here')
+        a = MDA(file_name, '', columns=['ID', 'TYPE', 'X', 'Y', 'Z', 'CHARGE']) 
+        a.restart_fluctuate(2500000)
 create_bash_files()
 run_bash()
 #######################
-for file_name in os.listdir("./"):
-    if file_name.endswith(".lammpstrj"):            
-        a = MDA(file_name, '', columns=['ID', 'TYPE', 'X', 'Y', 'Z', 'CHARGE'])
-        a.data['Types'][1]['mass'] = 15.9994
-        a.data['Types'][2]['mass'] = 28.0860
-        a.data['Types'][3]['mass'] = 91.224
-        a.save_as_lammps_data()
-        a.create_lammps_input('ffield.reax', type_of_simulation = 'fluctuation', equiliberation_duration = 100000, fluctuation_duration = 100000000)
-create_bash_files()
-run_bash()
+#for file_name in os.listdir("./"):
+#    if file_name.endswith(".lammpstrj"):            
+#        a = MDA(file_name, '', columns=['ID', 'TYPE', 'X', 'Y', 'Z', 'CHARGE'])
+#        a.data['Types'][1]['mass'] = 15.9994
+#        a.data['Types'][2]['mass'] = 28.0860
+#        a.data['Types'][3]['mass'] = 91.224
+#        a.save_as_lammps_data()
+#        a.create_lammps_input('ffield.reax', type_of_simulation = 'fluctuation', equiliberation_duration = 100000, fluctuation_duration = 100000000)
+#create_bash_files()
+#run_bash()
