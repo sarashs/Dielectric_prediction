@@ -39,7 +39,7 @@ def run_bash():
 #run_bash()
 #######################
 for file_name in os.listdir("./"):
-    if file_name.endswith(".lammpstrj"):            
+    if file_name.endswith(".lammpstrj") and file_name.startswith('anneal_dielectricpercent'):            
         a = MDA(file_name, '', columns=['ID', 'TYPE', 'X', 'Y', 'Z', 'CHARGE'])
         a.restart_fluctuate(18500000)
 create_bash_files()

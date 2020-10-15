@@ -37,7 +37,14 @@ def run_bash():
 #        a.create_lammps_input('ffield.reax')
 #create_bash_files()
 #run_bash()
-#####################################################
+#######################
+for file_name in os.listdir("./"):
+    if file_name.endswith(".lammpstrj") and file_name.startswith('anneal_dielectricpercent'):            
+        a = MDA(file_name, '', columns=['ID', 'TYPE', 'X', 'Y', 'Z', 'CHARGE'])
+        a.restart_fluctuate(3000000)
+create_bash_files()
+run_bash()
+#######################
 for file_name in os.listdir("./"):
     if file_name.endswith(".lammpstrj"):            
         a = MDA(file_name, '', columns=['ID', 'TYPE', 'X', 'Y', 'Z', 'CHARGE'])

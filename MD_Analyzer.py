@@ -5,9 +5,9 @@ Created on Sun Aug 23 11:53:44 2020
 @author: sarashs
 """
 from random import randint
-from matplotlib import pyplot as plot
+#from matplotlib import pyplot as plot
 import time
-import numpy as np
+#import numpy as np
 
 Kb = 1.380649e-23
 ε0 = 8.8541878128e-12
