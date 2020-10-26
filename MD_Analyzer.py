@@ -294,7 +294,7 @@ class MD_Analyzer(object):
         """
         s=open(self.Trajectory_file_name.replace('.lammpstrj','') + '.in','w')
         s.write('# 1.- Inizialization #######################\n')
-        s.write('read_restart ' + self.Trajectory_file_name.replace('.lammpstrj','.') + str(time_step) + '.restart\n')
+        s.write('read_restart ' + self.Trajectory_file_name.replace('.lammpstrj','.') + 'restart.' + str(time_step) + '\n')
 
         s.write('\n'+'fix 99 all qeq/reax 1 0.0 10.0 1.0e-6 reax/c\n')
         s.write('neighbor        2.0 bin\n')
