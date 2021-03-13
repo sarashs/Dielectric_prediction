@@ -8,6 +8,7 @@ from random import randint, choice
 from matplotlib import pyplot as plot
 import time
 import numpy as np
+from tqdm import tqdm
 
 #params = {'axes.labelsize': 36}#,'axes.titlesize':24, 'font.size': 24, 'legend.fontsize': 24, 'xtick.labelsize': 24, 'ytick.labelsize': 24}
 #plot.rcParams.update(params)
@@ -17,7 +18,24 @@ Kb = 1.380649e-23
 e_charge = 1.602176634e-19
 Angstrom = 1e-10
 coef = e_charge**2 / (Angstrom)
-
+class Neighbor(object):
+    def __init__(self, neighbor_type, neighbor_id, neighbor_distance, vector):
+        self.TYPE = neighbor_type
+        self.ID = neighbor_id
+        self.DISTANCE = neighbor_distance
+        self.VECTOR = vector
+class Atom(object):
+    def __init__(self, ID, TYPE, CHARGE, X, Y, Z, Vx = 0, Vy = 0, Vz = 0):
+        self.ID = ID 
+        self.TYPE = TYPE
+        self.CHARGE = CHARGE
+        self.X = X
+        self.Y = Y
+        self.Z = Z
+        self.Vx = Vx
+        self.Vy = Vy 
+        self.Vz = Vz
+        self.NEIGHBORS = None
 class MD_Analyzer(object):
     """This is a python class for analyzing LAMMPS outputs
     :attribute simulation_ID: string
@@ -26,7 +44,10 @@ class MD_Analyzer(object):
     def __init__(self, Trajectory_file_name, simulation_ID = 0, columns=['ID', 'TYPE', 'CHARGE', 'X', 'Y', 'Z', 'Vx', 'Vy', 'Vz']):
         self.number_of_atoms = 0
         self.place_holder = {'Dimensions' : 0, 'Masses' : 0, 'Atoms' : 0}
-        self.data = {'Dimensions' : [0, 0, 0], 'Types' : {1 : {'mass' : 0, 'count' : 0, 'IDs' : []}}, 'data' : {1 : {'TYPE' : 0, 'CHARGE' : 0, 'X' : 0, 'Y' : 0, 'Z' : 0}}} 
+        self.data = {'Dimensions' : [0, 0, 0], 'Types' : {1 : {'mass' : 0, 'count' : 0, 'IDs' : []}}, 'data' : []} #{1 : {'TYPE' : 0, 'CHARGE' : 0, 'X' : 0, 'Y' : 0, 'Z' : 0, 'NEIGHBORS' : []}} 
+        """
+        self.data['data'] is a dictionary where ID is keys and value is a dictionary of TYPE, CHARGE, X, Y, Z, and NEIGHBORS (which is the list of neighbors NEIGHNBORS = [neighbor_type])
+        """
         self.columns = {j : i for i,j in enumerate(columns)}
         self.last_timestep_index = 0
         self.magnetic_moment = 0 #total magnetic moment of the device
@@ -35,8 +56,29 @@ class MD_Analyzer(object):
         self.simulation_ID = str(simulation_ID)
         self.updated_lines = self.lines
         self.time_step = 0
-        self.neighbors = {}
         self.neighbor_distance = 0
+    def neighbors(self, neighbor_distance):
+        for item in self.data['data']:
+            item.NEIGHBORS = []
+            for item2 in self.data['data']:
+                a = [item.X, item.Y, item.Z] 
+                b = [item2.X, item2.Y, item2.Z]
+                vector = self.periodic_subtract(a,b)
+                if vector[0] < neighbor_distance and vector[1] < neighbor_distance and vector[2] < neighbor_distance:
+                    dist = np.linalg.norm(vector)
+                    if (dist < neighbor_distance) and (dist > 0):
+                        neigh_item = Neighbor(item2.TYPE ,item2.ID, dist, vector)
+                        item.NEIGHBORS.append(neigh_item)  
+    def angle_statistics(self, type1, type2, type3):
+        print("make sure to run neighbor() first.")
+        angle_list = []
+        for item1 in self.data['data']:
+            if (item1.TYPE == type1):
+                for item2 in item1.NEIGHBORS:
+                    for item3 in self.data['data'][item2.ID-1].NEIGHBORS:
+                        if (item2.TYPE == type2) and (item3.TYPE == type3) and (item3.ID != item1.ID):
+                            angle_list.append(np.arccos(np.dot(-item2.VECTOR, item3.VECTOR)))
+        return angle_list
     def read_data(self, time_step = -1):
         # By default the last timestep will be read
         if self.Trajectory_file_name.endswith('.lammpstrj'):
@@ -56,6 +98,7 @@ class MD_Analyzer(object):
                             self.last_timestep_index = i  
                     self.time_step = int(self.lines[self.last_timestep_index + 1].replace(' ',''))
                     self.number_of_atoms = int(self.lines[self.last_timestep_index + 3].replace(' ',''))
+                    self.data['data'] = [0] * self.number_of_atoms
                     x_dim = self.lines[self.last_timestep_index + 5].split()
                     y_dim = self.lines[self.last_timestep_index + 6].split() 
                     z_dim = self.lines[self.last_timestep_index + 7].split() 
@@ -67,12 +110,13 @@ class MD_Analyzer(object):
                     self.data['Types'][int(temp[self.columns['TYPE']])]['IDs'].append(int(temp[self.columns['ID']]))
                 else:
                     self.data['Types'][int(temp[self.columns['TYPE']])] = {'mass' : 0, 'count' : 1, 'IDs' : [int(temp[self.columns['ID']])]}
-                self.data['data'][int(temp[self.columns['ID']])] = {}
-                self.data['data'][int(temp[self.columns['ID']])]['TYPE'] = int(temp[self.columns['TYPE']]) 
-                self.data['data'][int(temp[self.columns['ID']])]['CHARGE'] = float(temp[self.columns['CHARGE']])
-                self.data['data'][int(temp[self.columns['ID']])]['X'] = float(temp[self.columns['X']]) - float(x_dim[0])
-                self.data['data'][int(temp[self.columns['ID']])]['Y'] = float(temp[self.columns['Y']]) - float(y_dim[0])
-                self.data['data'][int(temp[self.columns['ID']])]['Z'] = float(temp[self.columns['Z']]) - float(z_dim[0])
+                ID = int(temp[self.columns['ID']])
+                TYPE = int(temp[self.columns['TYPE']])
+                CHARGE = float(temp[self.columns['CHARGE']])
+                X = float(temp[self.columns['X']]) - float(x_dim[0])
+                Y = float(temp[self.columns['Y']]) - float(y_dim[0])
+                Z = float(temp[self.columns['Z']]) - float(z_dim[0])
+                self.data['data'][ID-1] = Atom(ID, TYPE, CHARGE, X, Y, Z)
             self.file.close()
                 
         if self.Trajectory_file_name.endswith('.data'):
@@ -112,39 +156,51 @@ class MD_Analyzer(object):
                             ID_index = self.columns['ID']
                             self.data['Types'][int(temp[type_index])]['IDs'].append(int(temp[ID_index]))
                             self.data['Types'][int(temp[type_index])]['count'] += 1
-                            self.data['data'][int(temp[ID_index])] = {'TYPE' : int(temp[type_index]), 'CHARGE' : float(temp[charge_index]), 'X' : float(temp[x_index]), 'Y' : float(temp[y_index]), 'Z' : float(temp[z_index])}
+                            self.data['data'][ID_index-1] = Atom(int(temp[ID_index]), int(temp[type_index]), float(temp[charge_index]), float(temp[x_index]), float(temp[y_index]), float(temp[z_index]))
                         else:
                             ID = j + 1 - self.place_holder['Atoms']
                             self.data['Types'][int(temp[type_index])]['IDs'].append(ID)
                             self.data['Types'][int(temp[type_index])]['count'] += 1
-                            self.data['data'][ID] = {'TYPE' : int(temp[type_index]), 'CHARGE' : float(temp[charge_index]), 'X' : float(temp[x_index]), 'Y' : float(temp[y_index]), 'Z' : float(temp[z_index])}
-
+                            self.data['data'][ID-1] = Atom(ID, int(temp[type_index]), float(temp[charge_index]), float(temp[x_index]), float(temp[y_index]), float(temp[z_index]))
             self.file.close()
     def recenter(self, inputs):
         output = inputs
         for i,j in enumerate(output):
             output[i] -= self.data['Dimensions'][i]/2
         return output
-    def periodic_distance(self, a, b):
-        pass
+    def periodic_subtract(self, a, b):
+        """This function computes the subtract between vectors a and b (b-a) considering the priodic boundary condition"""
+        c = np.array([0.0, 0.0 ,0.0])
+        for i in range(3):
+            if a[i] < b[i]:
+                if b[i] - a[i] < self.data['Dimensions'][i]:
+                    c[i] = b[i] - a[i]
+                else:
+                    c[i] = b[i] - a[i] - self.data['Dimensions'][i]
+            else:
+                if abs(b[i] - a[i]) < self.data['Dimensions'][i]:
+                    c[i] = b[i] - a[i]
+                else:
+                    c[i] = b[i] - a[i] + self.data['Dimensions'][i]
+        return c
     def sphere_percentage(self,radius):
         ## molar percent calculator
         num_zr = 0
         num_si = 0
         ##
         for i in range(1, self.number_of_atoms + 1):
-            if np.linalg.norm(self.recenter([self.data['data'][i]['X'], self.data['data'][i]['Y'], self.data['data'][i]['Z']])) < radius:
+            if np.linalg.norm(self.recenter([self.data['data'][i-1].X, self.data['data'][i-1].Y, self.data['data'][i-1].Z])) < radius:
                 ## molar percent calculator
-                if self.data['data'][i]['TYPE'] == 3:
+                if self.data['data'][i-1].TYPE == 3:
                     num_zr += 1
-                elif self.data['data'][i]['TYPE'] == 2:
+                elif self.data['data'][i-1].TYPE == 2:
                     num_si += 1
                 ##
         return num_zr/(num_zr + num_si)
     def sphere_set(self,radius):
         ID_list = []
         for i in range(1, self.number_of_atoms + 1):
-            if np.linalg.norm(self.recenter([self.data['data'][i]['X'], self.data['data'][i]['Y'], self.data['data'][i]['Z']])) < radius:
+            if np.linalg.norm(self.recenter([self.data['data'][i-1].X, self.data['data'][i-1].Y, self.data['data'][i-1].Z])) < radius:
                 ID_list.append(i)
         return ID_list
     def cube_set(self,from_the_edge):
@@ -156,13 +212,13 @@ class MD_Analyzer(object):
         num_si = 0
         ##
         for i in range(1, self.number_of_atoms + 1):
-            if (self.data['data'][i]['X'] - from_the_edge > 0) and (self.data['data'][i]['X'] + from_the_edge < self.data['Dimensions'][0]):
-                if (self.data['data'][i]['Y'] - from_the_edge > 0) and (self.data['data'][i]['Y'] + from_the_edge < self.data['Dimensions'][1]):
-                    if (self.data['data'][i]['Z'] - from_the_edge > 0) and (self.data['data'][i]['Z'] + from_the_edge < self.data['Dimensions'][2]):
+            if (self.data['data'][i-1].X - from_the_edge > 0) and (self.data['data'][i-1].X + from_the_edge < self.data['Dimensions'][0]):
+                if (self.data['data'][i-1].Y - from_the_edge > 0) and (self.data['data'][i-1].Y + from_the_edge < self.data['Dimensions'][1]):
+                    if (self.data['data'][i-1].Z - from_the_edge > 0) and (self.data['data'][i-1].Z + from_the_edge < self.data['Dimensions'][2]):
                         ## molar percent calculator
-                        if self.data['data'][i]['TYPE'] == 3:
+                        if self.data['data'][i-1].TYPE == 3:
                             num_zr += 1
-                        elif self.data['data'][i]['TYPE'] == 2:
+                        elif self.data['data'][i-1].TYPE == 2:
                             num_si += 1
                         ##
         return num_zr/(num_zr + num_si)
@@ -171,9 +227,9 @@ class MD_Analyzer(object):
         temp = [0, 0, 0]
         self.read_data(time_step)
         for i in ID_list: #range(1, self.number_of_atoms + 1):
-            atom = self.recenter([self.data['data'][i]['X'], self.data['data'][i]['Y'], self.data['data'][i]['Z']]) 
+            atom = self.recenter([self.data['data'][i-1].X, self.data['data'][i-1].Y, self.data['data'][i-1].Z]) 
             #if self.data['data'][i]['ID'] in ID_list:
-            temp = [k*self.data['data'][i]['CHARGE']+temp[j] for j,k in enumerate(atom)]
+            temp = [k*self.data['data'][i-1].CHARGE + temp[j] for j,k in enumerate(atom)]
         #MF = np.linalg.norm(temp)#/number_of_molecules_in_sphere
         return np.array(temp)
     def Dipole_moment_fluctuation(self, init_timestep, span_timestep, final_timestep, T, radius, shape = 'sphere'):
@@ -206,7 +262,7 @@ class MD_Analyzer(object):
             MF_list.append(sum(MF))
         end = time.time()
         print(f'it took {end - start} seconds.')
-        return MF_list#DMF_list
+        return DMF_list
     def save_as_lammps_data(self, time_step = -1):
         # By default the last timestep will be read
         if time_step != -1:
@@ -220,17 +276,17 @@ class MD_Analyzer(object):
             if  self.data['Types'][i]['count'] > 0:
                 file.write(str(i) + ' ' + str(self.data['Types'][i]['mass']) + '\n')
         file.write('\n' + 'Atoms\n' + '# number types charges\n')
-        key_list = list(self.data['data'].keys())
+        key_list = self.data['data']
         key_list.sort()
         for i in key_list:
-            file.write(str(i).ljust(6) + str(self.data['data'][i]['TYPE']).ljust(4) + str(self.data['data'][i]['CHARGE']).ljust(12) + str(self.data['data'][i]['X']).ljust(12) + str(self.data['data'][i]['Y']).ljust(12) + str(self.data['data'][i]['Z']) + '\n')
+            file.write(str(i).ljust(6) + str(self.data['data'][i-1].TYPE).ljust(4) + str(round(self.data['data'][i-1].CHARGE, 8)).ljust(12) + str(round(self.data['data'][i-1].X, 8)).ljust(12) + str(round(self.data['data'][i-1].Y, 8)).ljust(12) + str(round(self.data['data'][i-1].Z, 8)) + '\n')
         file.close()
     def replace_atoms(self, type_final, ID):
         """
         Changes the type of an atom
         """
-        current_type = self.data['data'][ID]['TYPE']
-        self.data['data'][ID]['TYPE'] = type_final
+        current_type = self.data['data'][ID-1].TYPE
+        self.data['data'][ID-1].TYPE= type_final
         self.data['Types'][current_type]['count'] -= 1
         self.data['Types'][current_type]['IDs'].remove(ID)
         self.data['Types'][type_final]['count'] += 1
@@ -363,6 +419,15 @@ class MD_Analyzer(object):
         s.write('# 1.- Inizialization #######################\n')
         s.write('read_restart ' + self.Trajectory_file_name.replace('.lammpstrj','.') + 'restart.' + str(time_step) + '\n')
 
+        #Forcefield params
+        s.write('pair_style reax/c NULL\n')
+        if 'Input_forcefield' in kwargs.keys():
+            pass
+        else:
+            Input_forcefield = 'ffield.reax'
+        s.write('pair_coeff * * ' + Input_forcefield + ' ' + 'O Si Zr\n')
+        #calculate number of atom types
+
         s.write('\n'+'fix 99 all qeq/reax 1 0.0 10.0 1.0e-6 reax/c\n')
         s.write('neighbor        2.0 bin\n')
         s.write('neigh_modify    every 10 check yes\n\n')
@@ -386,3 +451,35 @@ class MD_Analyzer(object):
         s.write('unfix MD6\n')
         s.write('undump DUMP4\n')
         s.close()
+def consistent_plot(X, Y, YERR, XERR, labels, formats, alphas, xlabel, ylabel, title, save_name, bar = "NO"):
+    """The arguments are all lists!"""
+    plot.figure(figsize=(16,12))
+    FONT_SIZE = 36
+    plot.figure(figsize=(16,12))
+    plot.rc('font', size=FONT_SIZE)          # controls default text sizes
+    plot.rc('axes', titlesize=FONT_SIZE)     # fontsize of the axes title
+    plot.rc('axes', labelsize=FONT_SIZE)    # fontsize of the x and y labels
+    plot.rc('xtick', labelsize=FONT_SIZE)    # fontsize of the tick labels
+    plot.rc('ytick', labelsize=FONT_SIZE)    # fontsize of the tick labels
+    plot.rc('legend', fontsize=32)    # legend fontsize
+    plot.rc('figure', titlesize=FONT_SIZE)  # fontsize of the figure title
+    for i, j in enumerate(labels):
+        if len(formats) > 0:
+            if "YES" in bar:
+                plot.bar(X[i], Y[i], formats[i], alpha = alphas[i], markersize=5.0,linewidth=3.0,label = labels[i])
+            else:
+                plot.errorbar(X[i], Y[i], yerr = YERR[i], xerr = XERR[i], fmt = formats[i], alpha = alphas[i], markersize=15.0,linewidth=3.0,label = labels[i])
+        else:
+            if "YES" in bar:
+                plot.bar(X[i], Y[i], alpha = alphas[i], markersize=5.0,linewidth=3.0,label = labels[i])
+            else:
+                plot.errorbar(X[i], Y[i], yerr = YERR[i], xerr = XERR[i], fmt = formats[i], alpha = alphas[i], markersize=15.0,linewidth=3.0,label = labels[i])
+    plot.xlabel(xlabel)
+    plot.ylabel(ylabel)
+    #plot.xticks(fontsize = 36)
+    #plot.yticks(fontsize = 36)
+    plot.title(title)
+    plot.legend()
+    plot.grid()
+    plot.savefig(save_name + '.png')
+    plot.show()

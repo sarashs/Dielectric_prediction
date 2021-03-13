@@ -36,7 +36,7 @@ def run_bash():
 #run_bash()
 ########################
 # find the fastest combination
-a = MDA('Large_cell.data', columns=['ID', 'TYPE',  'X', 'Y', 'Z', 'CHARGE'])
+a = MDA('Large_cell.data', columns=['ID', 'TYPE', 'CHARGE',  'X', 'Y', 'Z'])
 a.save_as_lammps_data()
 a.create_lammps_input('ffield.reax', type_of_simulation = 'anneal', equiliberation_duration = 100000, annealing_duration = 500000)
 for num_nodes in [1,2,3,4]:
