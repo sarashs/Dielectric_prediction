@@ -6,9 +6,12 @@ Created on Sun Aug 23 11:53:44 2020
 """
 from random import randint, choice
 from matplotlib import pyplot as plot
+#import multiprocessing
 import time
 import numpy as np
-from tqdm import tqdm
+from copy import deepcopy
+from numba import njit
+#from tqdm import tqdm
 
 #params = {'axes.labelsize': 36}#,'axes.titlesize':24, 'font.size': 24, 'legend.fontsize': 24, 'xtick.labelsize': 24, 'ytick.labelsize': 24}
 #plot.rcParams.update(params)
@@ -18,6 +21,8 @@ Kb = 1.380649e-23
 e_charge = 1.602176634e-19
 Angstrom = 1e-10
 coef = e_charge**2 / (Angstrom)
+atomic_mass = 1.66053906660e-24 #grams
+
 class Neighbor(object):
     def __init__(self, neighbor_type, neighbor_id, neighbor_distance, vector):
         self.TYPE = neighbor_type
@@ -35,7 +40,29 @@ class Atom(object):
         self.Vx = Vx
         self.Vy = Vy 
         self.Vz = Vz
-        self.NEIGHBORS = None
+        self.NEIGHBORS = []
+
+@njit
+def _periodic_subtract(a, b, dimentions):
+    """This function computes the subtract between vectors a and b (b-a) considering the priodic boundary condition"""
+    c = np.array([0.0, 0.0 ,0.0])
+    for i in range(3):
+        if a[i] < b[i]:
+            if b[i] - a[i] < dimentions[i]:
+                c[i] = b[i] - a[i]
+            else:
+                c[i] = b[i] - a[i] - dimentions[i]
+        else:
+            if np.abs(b[i] - a[i]) < dimentions[i]:
+                c[i] = b[i] - a[i]
+            else:
+                c[i] = b[i] - a[i] + dimentions[i]
+    dist = np.linalg.norm(c)
+    return [dist, c]
+
+class simple_bunching(object):
+    def __init__(self, dimensions, grid_res, sorted_list_of_atoms):
+        pass
 class MD_Analyzer(object):
     """This is a python class for analyzing LAMMPS outputs
     :attribute simulation_ID: string
@@ -58,17 +85,32 @@ class MD_Analyzer(object):
         self.time_step = 0
         self.neighbor_distance = 0
     def neighbors(self, neighbor_distance):
-        for item in self.data['data']:
-            item.NEIGHBORS = []
-            for item2 in self.data['data']:
-                a = [item.X, item.Y, item.Z] 
-                b = [item2.X, item2.Y, item2.Z]
-                vector = self.periodic_subtract(a,b)
-                if vector[0] < neighbor_distance and vector[1] < neighbor_distance and vector[2] < neighbor_distance:
+        self._neighbor_distance = neighbor_distance
+        ## for multiprocessing
+        serial = True
+        ##Serial processing
+        if serial == True: 
+            print("Serial processing")
+            for item in self.data['data']:
+                for j in range(item.ID, len(self.data['data'])):
+                    a = [item.X, item.Y, item.Z] 
+                    b = [self.data['data'][j].X, self.data['data'][j].Y, self.data['data'][j].Z]
+                    vector = self.periodic_subtract(a,b)
                     dist = np.linalg.norm(vector)
+                    #[dist, vector] = _periodic_subtract(np.array(a),np.array(b), np.array(self.data['Dimensions']))
                     if (dist < neighbor_distance) and (dist > 0):
-                        neigh_item = Neighbor(item2.TYPE ,item2.ID, dist, vector)
-                        item.NEIGHBORS.append(neigh_item)  
+                        self.data['data'][j].NEIGHBORS.append(Neighbor(item.TYPE ,item.ID, dist, -vector))  
+                        item.NEIGHBORS.append(Neighbor(self.data['data'][j].TYPE ,self.data['data'][j].ID, dist, vector))  
+        ##Paralel processing
+        else:
+            pass
+        #    for item in self.data['data']:
+        #        _multi_processor_neighbor(item, neighbor_distance, self.data['data'], self.data['Dimensions'])
+    def density(self):
+        total_mass = 0
+        for item in self.data['Types'].keys():
+            total_mass += self.data['Types'][item]['mass'] * self.data['Types'][item]['count']
+        return (1e-6 * Angstrom**(-3) * atomic_mass) * total_mass / (self.data['Dimensions'][0] * self.data['Dimensions'][1] * self.data['Dimensions'][2]) #gr/cm^3
     def angle_statistics(self, type1, type2, type3):
         print("make sure to run neighbor() first.")
         angle_list = []
@@ -77,7 +119,7 @@ class MD_Analyzer(object):
                 for item2 in item1.NEIGHBORS:
                     for item3 in self.data['data'][item2.ID-1].NEIGHBORS:
                         if (item2.TYPE == type2) and (item3.TYPE == type3) and (item3.ID != item1.ID):
-                            angle_list.append(np.arccos(np.dot(-item2.VECTOR, item3.VECTOR)))
+                            angle_list.append(np.arccos(np.dot(-item2.VECTOR, item3.VECTOR)/(np.linalg.norm(item2.VECTOR) * np.linalg.norm(item3.VECTOR)))* 180 / np.pi)
         return angle_list
     def read_data(self, time_step = -1):
         # By default the last timestep will be read
@@ -481,5 +523,5 @@ def consistent_plot(X, Y, YERR, XERR, labels, formats, alphas, xlabel, ylabel, t
     plot.title(title)
     plot.legend()
     plot.grid()
-    plot.savefig(save_name + '.png')
+    plot.savefig(save_name + '.pdf')
     plot.show()
